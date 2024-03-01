@@ -46,9 +46,7 @@ const server = app.listen(PORT , console.log(`Started on port PORT ${PORT}`)) ;
 
 const io = require('socket.io')(server , {
     pingTimeout : 60000,
-    cors : {
-        origin:"https://talk-a-tive-w6il.onrender.com/"
-    }
+    cors : true
 }) ;
 
 io.on("connection" , (socket)=>{
