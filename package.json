@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node backend/server.js" ,
-    "build" : "npm install && npm install --prefix frontent && npm run build --prefix build"
+    "build" : "npm install && npm install --prefix frontend && npm run build --prefix frontend"
   },
   "author": "Abhishek Gupta",
   "license": "ISC",
