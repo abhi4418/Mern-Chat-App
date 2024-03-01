@@ -4,12 +4,13 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "start": "node backend/server.js" ,
-    "build" : "npm install && npm install --prefix frontend && npm run build --prefix frontend"
+    "start": "node backend/server.js",
+    "build": "npm install && npm install --prefix frontend && npm run build --prefix frontend"
   },
   "author": "Abhishek Gupta",
   "license": "ISC",
   "dependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -18,7 +19,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.1.3",
     "react-notification-badge": "^1.5.1",
-    "socket.io": "^4.7.4" ,
+    "socket.io": "^4.7.4",
     "vite": "^5.1.4"
   }
 }
