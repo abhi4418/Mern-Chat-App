@@ -9,7 +9,19 @@ const messageModel = mongoose.Schema({
     chat : {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Chat"
-    }
+    },
+    isEdited: {
+        type: Boolean,
+        default: false
+    },
+    editHistory: [{
+        content: { type: String, trim: true },
+        editedAt: { type: Date, default: Date.now },
+        editedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        }
+    }]
 } ,{
     timestamps : true 
 })

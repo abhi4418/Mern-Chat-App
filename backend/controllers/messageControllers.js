@@ -52,4 +52,59 @@ const allMessages = expressAsyncHandler(async(req, res)=>{
     }
 })
 
-module.exports = {sendMessage , allMessages} ;
+const editMessage = expressAsyncHandler(async(req, res)=>{
+    const {messageId, content} = req.body;
+
+    if(!messageId || !content){
+        res.status(400);
+        throw new Error("Message ID and content are required");
+    }
+
+    try {
+        const message = await Message.findById(messageId);
+        
+        if(!message){
+            res.status(404);
+            throw new Error("Message not found");
+        }
+
+        if(message.sender.toString() !== req.user._id.toString()){
+            res.status(403);
+            throw new Error("You can only edit your own messages");
+        }
+
+        if(!message.isEdited){
+            message.editHistory.push({
+                content: message.content,
+                editedAt: new Date(),
+                editedBy: req.user._id
+            });
+        }
+
+        message.content = content;
+        message.isEdited = true;
+        
+        message.editHistory.push({
+            content: content,
+            editedAt: new Date(),
+            editedBy: req.user._id
+        });
+
+        await message.save();
+
+        await message.populate("sender", "name pic email");
+        await message.populate("chat");
+
+        const io = req.app.get('io');
+        if (io && message.chat) {
+            io.to(message.chat._id ? message.chat._id.toString() : message.chat.toString()).emit("message edited", message);
+        }
+
+        res.json(message);
+    } catch (error) {
+        res.status(400);
+        throw new Error(error.message);
+    }
+});
+
+module.exports = {sendMessage, allMessages, editMessage};
