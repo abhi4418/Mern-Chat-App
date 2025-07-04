@@ -21,7 +21,8 @@
     "react-lottie": "^1.2.4",
     "react-router-dom": "^5.3.4",
     "react-scrollable-feed": "^2.0.1",
-    "socket.io-client": "^4.7.4"
+    "socket.io-client": "^4.7.4",
+    "talk-a-tive": "file:.."
   },
   "devDependencies": {
     "@types/react": "^18.2.56",
@@ -31,6 +32,6 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "vite": "^5.1.4"
+    "vite": "^7.0.2"
   }
 }
