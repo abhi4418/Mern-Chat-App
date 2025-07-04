@@ -4,3 +4,21 @@
     overflow-y: scroll;
     scrollbar-width: none;
 }
+
+.message-bubble {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.message-bubble:hover .edit-menu {
+    opacity: 1 !important;
+}
+
+.edit-menu {
+    transition: opacity 0.2s ease;
+}
+
+.edited-indicator {
+    font-style: italic;
+    opacity: 0.7;
+}

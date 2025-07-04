@@ -21,7 +21,7 @@ const MyChats = ({fetchAgain}) => {
           }
       }
 
-      const {data} = await axios.get("/api/chat" , config) ;
+      const {data} = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/chat` , config) ;
       if(!chats.find((c) => c._id=== data._id)){
         setChats([data , ...chats])
       }

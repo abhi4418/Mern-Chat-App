@@ -32,7 +32,7 @@ const Login = () => {
           }
         } ;
 
-        const res= await axios.post("/api/user/login" , {
+        const res= await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/user/login` , {
           email , password
         } , {config}) ;
 

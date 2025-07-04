@@ -29,7 +29,7 @@ const GroupChatModal = ({children}) => {
         headers : { Authorization : `Bearer ${user.token}`}
     }    
 
-    const {data} = await axios.get(`/api/user?search=${search}` , config) ;
+    const {data} = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user?search=${search}` , config) ;
     setLoading(false) ;
     setSearchResult(data) ;
     }
@@ -62,7 +62,7 @@ const GroupChatModal = ({children}) => {
             headers : { Authorization : `Bearer ${user.token}`}
         }
         
-        const {data} = await axios.post('/api/chat/group' , {
+        const {data} = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/chat/group` , {
             name : groupChatName , users : JSON.stringify(selectedUsers.map((u)=>u._id))
         } , config)
 

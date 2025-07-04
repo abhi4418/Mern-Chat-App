@@ -12,7 +12,7 @@ import io from 'socket.io-client'
 import Lottie from 'react-lottie'
 import animationData from '../animations/typing.json'
 
-const ENDPOINT = "https://talk-a-tive-w6il.onrender.com/" ;
+const ENDPOINT = import.meta.env.VITE_BACKEND_URL ;
 var socket , selectedChatCompare ;
 
 
@@ -49,7 +49,7 @@ const SingleChat = ({fetchAgain , setFetchAgain}) => {
         }
       } 
       setLoading(true) ;
-      const {data} = await axios.get(`/api/message/${selectedChat._id}` , config) ;
+      const {data} = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/message/${selectedChat._id}` , config) ;
 
       setMessages(data) ;
       setLoading(false) ;
@@ -69,7 +69,9 @@ const SingleChat = ({fetchAgain , setFetchAgain}) => {
   }
 
   useEffect(()=>{
-    socket = io(ENDPOINT) ;
+    socket = io(ENDPOINT, {
+      auth: { token: user.token }
+    });
     socket.emit('setup' , user) ;
     socket.on('connected' , ()=>{
       setSocketConnected(true) ;
@@ -103,6 +105,19 @@ const SingleChat = ({fetchAgain , setFetchAgain}) => {
       }
     })
 
+    // Listen for message edited event
+    socket.on('message edited', (editedMessage) => {
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg._id === editedMessage._id ? editedMessage : msg
+        )
+      );
+    });
+
+    return () => {
+      socket.off('message recieved');
+      socket.off('message edited');
+    };
   })
 
   const sendMessage = async(e) => {
@@ -117,7 +132,7 @@ const SingleChat = ({fetchAgain , setFetchAgain}) => {
         } 
         
         setNewMessage("") ;
-        const {data} = await axios.post('/api/message' , {
+        const {data} = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/message` , {
           content : newMessage , 
           chatId : selectedChat._id 
         } , config) ;
@@ -206,7 +221,7 @@ const SingleChat = ({fetchAgain , setFetchAgain}) => {
             <Spinner size='xl' w={20} h={20} alignSelf='center' margin='auto'/>
           ) : (
             <div className='messages'>
-              <ScrollableChat messages={messages} />
+              <ScrollableChat messages={messages} setMessages={setMessages} />
             </div>
           )}
 

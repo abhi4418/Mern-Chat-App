@@ -95,7 +95,7 @@ const Signup = () => {
         }
       }
 
-      const res = await axios.post("/api/user" , {name , email , password , pic} ,{
+      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/user` , {name , email , password , pic} ,{
         config
       }) ;
 
