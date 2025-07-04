@@ -1,6 +1,7 @@
 const express = require("express") ;
 const app = express() ;
 const dotenv = require("dotenv")
+dotenv.config()
 const {chats} = require("./data/data.js")
 const cors = require('cors');
 const connectDB = require("./config/db.js");
@@ -13,8 +14,6 @@ const jwt = require('jsonwebtoken');
 const User = require('./models/userModel');
 
 app.use(cors()) ;
-
-dotenv.config({ path: '../.env' })
 connectDB() ;
 app.use(express.json()) ;
 
