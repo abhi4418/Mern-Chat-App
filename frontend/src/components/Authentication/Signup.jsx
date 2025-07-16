@@ -35,7 +35,6 @@ const Signup = () => {
         data.append("cloud_name","dfxn46e67")
         axios.post("https://api.cloudinary.com/v1_1/dfxn46e67/image/upload", data)
           .then((response) => {
-            console.log("Cloudinary response:", response);
             setPic(response.data.url.toString());
             setLoading(false);
             toast({
@@ -47,7 +46,6 @@ const Signup = () => {
             });
           })
           .catch((error) => {
-            console.log("Cloudinary error:", error);
             setLoading(false);
           });
       }
@@ -108,6 +106,34 @@ const Signup = () => {
       })
 
       localStorage.setItem('user-info' , JSON.stringify(res.data)) ;
+      // --- Begin RSA Key Generation and Upload ---
+      const generateAndStoreKeys = async () => {
+        // Check if private key already exists
+        if (!localStorage.getItem('privateKey')) {
+          // Generate RSA key pair
+          const keyPair = await window.crypto.subtle.generateKey({
+            name: "RSA-OAEP",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]),
+            hash: "SHA-256"
+          }, true, ["encrypt", "decrypt"]);
+
+          // Export and store private key (JWK)
+          const privateJwk = await window.crypto.subtle.exportKey('jwk', keyPair.privateKey);
+          localStorage.setItem('privateKey', JSON.stringify(privateJwk));
+
+          // Export and send public key (JWK)
+          const publicJwk = await window.crypto.subtle.exportKey('jwk', keyPair.publicKey);
+          await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/user/publicKey`, {
+            userId: res.data._id,
+            publicKey: publicJwk
+          }, {
+            headers: { Authorization: `Bearer ${res.data.token}` }
+          });
+        }
+      };
+      await generateAndStoreKeys();
+      // --- End RSA Key Generation and Upload ---
       setLoading(false) ;
       history.push('/chats') ;
     }

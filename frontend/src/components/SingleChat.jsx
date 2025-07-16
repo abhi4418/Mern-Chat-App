@@ -104,8 +104,7 @@ const SingleChat = ({fetchAgain , setFetchAgain}) => {
         setMessages([...messages , newMessageRecieved]) ;
       }
     })
-
-    // Listen for message edited event
+    
     socket.on('message edited', (editedMessage) => {
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
@@ -130,16 +129,73 @@ const SingleChat = ({fetchAgain , setFetchAgain}) => {
             Authorization : `Bearer ${user.token}`
           }
         } 
-        
         setNewMessage("") ;
+        let encryptedContent = newMessage;
+        if (!selectedChat.isGroupChat) {
+          const recipient = selectedChat.users[0]._id === user._id ? selectedChat.users[1] : selectedChat.users[0];
+          const pubRes = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/${recipient._id}/publicKey`, config);
+          const publicKeyJwk = JSON.parse(pubRes.data.publicKey);
+          const importedPubKey = await window.crypto.subtle.importKey(
+            'jwk',
+            publicKeyJwk,
+            { name: 'RSA-OAEP', hash: 'SHA-256' },
+            true,
+            ['encrypt']
+          );
+          const encoder = new TextEncoder();
+          const encodedMsg = encoder.encode(newMessage);
+          const encrypted = await window.crypto.subtle.encrypt(
+            { name: 'RSA-OAEP' },
+            importedPubKey,
+            encodedMsg
+          );
+          encryptedContent = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+        } else {
+          const encoder = new TextEncoder();
+          const encodedMsg = encoder.encode(newMessage);
+          const encryptedArray = [];
+          for (const member of selectedChat.users) {
+            if (member._id === user._id) continue;
+            try {
+              const pubRes = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/${member._id}/publicKey`, config);
+              const publicKeyJwk = JSON.parse(pubRes.data.publicKey);
+              const importedPubKey = await window.crypto.subtle.importKey(
+                'jwk',
+                publicKeyJwk,
+                { name: 'RSA-OAEP', hash: 'SHA-256' },
+                true,
+                ['encrypt']
+              );
+              const encrypted = await window.crypto.subtle.encrypt(
+                { name: 'RSA-OAEP' },
+                importedPubKey,
+                encodedMsg
+              );
+              const encryptedB64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+              encryptedArray.push({ userId: member._id, encrypted: encryptedB64 });
+            } catch (e) {
+              continue;
+            }
+          }
+          encryptedContent = JSON.stringify(encryptedArray);
+        }
         const {data} = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/message` , {
-          content : newMessage , 
+          content : encryptedContent , 
           chatId : selectedChat._id 
         } , config) ;
 
-        console.log(data) ;
+        const localMessage = {
+          ...data,
+          content: newMessage,
+          sender: { _id: user._id, name: user.name, pic: user.pic },
+        };
+        setMessages([...messages , localMessage]) ;
+        try {
+          const sentPlaintexts = JSON.parse(localStorage.getItem('sentPlaintexts') || '{}');
+          sentPlaintexts[data._id] = newMessage;
+          localStorage.setItem('sentPlaintexts', JSON.stringify(sentPlaintexts));
+        } catch (e) {}
         socket.emit('new message' , data) ;
-        setMessages([...messages , data]) ;
       }
        catch (error) {
           toast({

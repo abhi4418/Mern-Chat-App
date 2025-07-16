@@ -43,9 +43,7 @@ const registerUser = asyncHandler(async(req,res)=>{
 
 const authUser = asyncHandler(async(req,res)=>{
     const {email , password} = req.body ;
-
     const user = await User.findOne({email}) ;
-
     if(user && (await user.matchPassword(password))){
         res.json({
             _id : user._id ,
@@ -75,4 +73,28 @@ const allUsers = asyncHandler(async (req, res) => {
     res.send(users);
   });
 
-module.exports = {registerUser , authUser , allUsers}
+  
+const setPublicKey = asyncHandler(async (req, res) => {
+    const { userId, publicKey } = req.body;
+    if (!userId || !publicKey) {
+        return res.status(400).json({ message: 'userId and publicKey are required' });
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+    }
+    user.publicKey = JSON.stringify(publicKey);
+    await user.save();
+    res.status(200).json({ message: 'Public key updated successfully' });
+});
+
+const getPublicKey = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user || !user.publicKey) {
+        return res.status(404).json({ message: 'Public key not found' });
+    }
+    res.status(200).json({ publicKey: user.publicKey });
+});
+
+module.exports = {registerUser , authUser , allUsers, setPublicKey, getPublicKey}

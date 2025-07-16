@@ -1,7 +1,7 @@
 const express = require("express") ;
 const app = express() ;
 const dotenv = require("dotenv")
-dotenv.config()
+dotenv.config({ path: '../.env' })
 const {chats} = require("./data/data.js")
 const cors = require('cors');
 const connectDB = require("./config/db.js");
@@ -74,8 +74,6 @@ io.use(async (socket, next) => {
 });
 
 io.on("connection" , (socket)=>{
-    console.log('connected to socket.io');
-
     socket.on('setup' , (userData)=>{
         socket.join(userData._id) ;
         socket.emit('connected') ;
@@ -83,7 +81,6 @@ io.on("connection" , (socket)=>{
 
     socket.on('join chat' , (room)=>{
         socket.join(room) ;
-        console.log('User joined Room ' + room);
     })
 
     socket.on('typing' , (room)=> socket.in(room).emit('typing') )
@@ -94,7 +91,7 @@ io.on("connection" , (socket)=>{
         var chat = newMessageRecieved.chat ;
 
         if(!chat.users){
-            return console.log('chat.users not defined');
+            return ;
         }
 
         chat.users.forEach(user => {
@@ -107,7 +104,6 @@ io.on("connection" , (socket)=>{
     }) ;
 
     socket.off('setup' , ()=>{
-        console.log('USER DISCONNECTED') ;
         socket.leave(userData._id) ;
     })
 })

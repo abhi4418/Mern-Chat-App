@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import ScrollableFeed from 'react-scrollable-feed'
 import { isLastMessage, isSameSender, isSameSenderMargin } from '../config/ChatLogics'
 import { ChatState } from '../Context/ChatProvider'
@@ -19,6 +19,9 @@ import {
 } from '@chakra-ui/react'
 import { ChevronDownIcon, EditIcon, CheckIcon, CloseIcon } from '@chakra-ui/icons'
 import axios from 'axios'
+import io from 'socket.io-client';
+const ENDPOINT = import.meta.env.VITE_BACKEND_URL;
+let socket = window._globalSocket;
 
 const ScrollableChat = ({messages, setMessages}) => {
 
@@ -26,10 +29,97 @@ const ScrollableChat = ({messages, setMessages}) => {
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const toast = useToast();
+  const [decryptedMessages, setDecryptedMessages] = useState([]);
+
+  useEffect(() => {
+    const decryptAll = async () => {
+      if (!messages || !Array.isArray(messages)) return;
+      let privateKeyJwk = localStorage.getItem('privateKey');
+      let importedPrivKey = null;
+      if (privateKeyJwk) {
+        privateKeyJwk = JSON.parse(privateKeyJwk);
+        try {
+          importedPrivKey = await window.crypto.subtle.importKey(
+            'jwk',
+            privateKeyJwk,
+            { name: 'RSA-OAEP', hash: 'SHA-256' },
+            true,
+            ['decrypt']
+          );
+        } catch (e) { importedPrivKey = null; }
+      }
+      const decoder = new TextDecoder();
+      const newMsgs = await Promise.all(messages.map(async (m) => {
+        if (selectedChat && !selectedChat.isGroupChat) {
+          if (m.sender._id !== user._id && importedPrivKey) {
+            try {
+              const encryptedBytes = Uint8Array.from(atob(m.content), c => c.charCodeAt(0));
+              const decrypted = await window.crypto.subtle.decrypt(
+                { name: 'RSA-OAEP' },
+                importedPrivKey,
+                encryptedBytes
+              );
+              return { ...m, decryptedContent: decoder.decode(decrypted) };
+            } catch (e) {
+              return { ...m, decryptedContent: m.content };
+            }
+          } else {
+            return { ...m, decryptedContent: m.content };
+          }
+        } else if (selectedChat && selectedChat.isGroupChat) {  
+          if (m.sender._id === user._id) {
+            return { ...m, decryptedContent: m.content };
+          }
+          let arr = null;
+          try {
+            arr = JSON.parse(m.content);
+          } catch (e) {}
+          if (Array.isArray(arr)) {
+            const entry = arr.find(e => e.userId === user._id);
+            if (entry && importedPrivKey) {
+              try {
+                const encryptedBytes = Uint8Array.from(atob(entry.encrypted), c => c.charCodeAt(0));
+                const decrypted = await window.crypto.subtle.decrypt(
+                  { name: 'RSA-OAEP' },
+                  importedPrivKey,
+                  encryptedBytes
+                );
+                return { ...m, decryptedContent: decoder.decode(decrypted) };
+              } catch (e) {
+                return { ...m, decryptedContent: m.content };
+              }
+            } else {
+              return { ...m, decryptedContent: m.content };
+            }
+          } else {
+            return { ...m, decryptedContent: m.content };
+          }
+        } else {
+          return { ...m, decryptedContent: m.content };
+        }
+      }));
+      setDecryptedMessages(newMsgs);
+    };
+    decryptAll();
+  }, [messages, selectedChat, user._id]);
+
+  useEffect(() => {
+    if (!window._globalSocket) {
+      window._globalSocket = io(ENDPOINT, {
+        auth: { token: user.token }
+      });
+    }
+    socket = window._globalSocket;
+  }, [user.token]);
 
   const handleEditClick = (message) => {
     setEditingMessageId(message._id);
-    setEditContent(message.content);
+    if (message.sender._id === user._id) {
+      const sentPlaintexts = JSON.parse(localStorage.getItem('sentPlaintexts') || '{}');
+      setEditContent(sentPlaintexts[message._id] || message.content);
+    } else {
+      setEditContent(message.decryptedContent || message.content);
+    }
   };
 
   const handleEditCancel = () => {
@@ -48,34 +138,96 @@ const ScrollableChat = ({messages, setMessages}) => {
       });
       return;
     }
-
     try {
+      let encryptedContent = editContent;
+      if (!selectedChat.isGroupChat) {
+        const message = messages.find(m => m._id === messageId);
+        const recipient = selectedChat.users[0]._id === user._id ? selectedChat.users[1] : selectedChat.users[0];
+        const config = {
+          headers: {
+            "Content-type": "application/json",
+            Authorization: `Bearer ${user.token}`
+          }
+        };
+        const pubRes = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/${recipient._id}/publicKey`, config);
+        const publicKeyJwk = JSON.parse(pubRes.data.publicKey);
+        const importedPubKey = await window.crypto.subtle.importKey(
+          'jwk',
+          publicKeyJwk,
+          { name: 'RSA-OAEP', hash: 'SHA-256' },
+          true,
+          ['encrypt']
+        );
+        const encoder = new TextEncoder();
+        const encodedMsg = encoder.encode(editContent);
+        const encrypted = await window.crypto.subtle.encrypt(
+          { name: 'RSA-OAEP' },
+          importedPubKey,
+          encodedMsg
+        );
+        encryptedContent = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+      } else {
+        const encoder = new TextEncoder();
+        const encodedMsg = encoder.encode(editContent);
+        const encryptedArray = [];
+        for (const member of selectedChat.users) {
+          if (member._id === user._id) continue;
+          try {
+            const config = {
+              headers: {
+                "Content-type": "application/json",
+                Authorization: `Bearer ${user.token}`
+              }
+            };
+            const pubRes = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/${member._id}/publicKey`, config);
+            const publicKeyJwk = JSON.parse(pubRes.data.publicKey);
+            const importedPubKey = await window.crypto.subtle.importKey(
+              'jwk',
+              publicKeyJwk,
+              { name: 'RSA-OAEP', hash: 'SHA-256' },
+              true,
+              ['encrypt']
+            );
+            const encrypted = await window.crypto.subtle.encrypt(
+              { name: 'RSA-OAEP' },
+              importedPubKey,
+              encodedMsg
+            );
+            const encryptedB64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+            encryptedArray.push({ userId: member._id, encrypted: encryptedB64 });
+          } catch (e) { continue; }
+        }
+        encryptedContent = JSON.stringify(encryptedArray);
+      }
       const config = {
         headers: {
           "Content-type": "application/json",
           Authorization: `Bearer ${user.token}`
         }
       };
-
       const { data } = await axios.put(
         `${import.meta.env.VITE_BACKEND_URL}/api/message/edit`,
         {
           messageId: messageId,
-          content: editContent
+          content: encryptedContent
         },
         config
       );
-
-      // Update the message in the messages array
-      setMessages(prevMessages => 
-        prevMessages.map(msg => 
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
           msg._id === messageId ? data : msg
         )
       );
-
       setEditingMessageId(null);
       setEditContent('');
-
+      try {
+        const sentPlaintexts = JSON.parse(localStorage.getItem('sentPlaintexts') || '{}');
+        sentPlaintexts[messageId] = editContent;
+        localStorage.setItem('sentPlaintexts', JSON.stringify(sentPlaintexts));
+      } catch (e) {}
+      if (socket && socket.emit) {
+        socket.emit('message edited', data);
+      }
       toast({
         title: "Success",
         description: "Message updated successfully",
@@ -97,7 +249,6 @@ const ScrollableChat = ({messages, setMessages}) => {
   const shouldShowSenderName = (m, i) => {
     if (!selectedChat?.isGroupChat) return false;
     if (m.sender._id === user._id) return false;
-    // Show if first message or sender changes
     if (i === 0) return true;
     return messages[i - 1].sender._id !== m.sender._id;
   };
@@ -109,7 +260,7 @@ const ScrollableChat = ({messages, setMessages}) => {
 
   return (
     <ScrollableFeed>
-        {messages && messages.map((m,i)=>(
+        {decryptedMessages && decryptedMessages.map((m,i)=>(
             <div style={{display:"flex", flexDirection: "column"}} key={m._id}>
                 <div style={{display: "flex"}}>
                 {
@@ -180,7 +331,10 @@ const ScrollableChat = ({messages, setMessages}) => {
                     ) : (
                       <>
                         <Text fontSize="md" color="black">
-                          {m.content}
+                          {m.sender._id === user._id
+                            ? (JSON.parse(localStorage.getItem('sentPlaintexts') || '{}')[m._id] ||
+                                <span style={{ color: '#888', fontStyle: 'italic' }}>(Encrypted message sent)</span>)
+                            : m.decryptedContent}
                         </Text>
                         <Flex alignItems="center" justifyContent="flex-end" mt={1}>
                           {m.isEdited && (
